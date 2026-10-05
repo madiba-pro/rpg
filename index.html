@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Password generator</title>
+<style>
+:root{
+  --bg:#eef1ee; --panel:#ffffff; --ink:#1d2b26; --muted:#5d6b65; --line:#cfd8d3;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --track:#d9e1dd;
+  --weak:#b3402f; --fair:#b7791f; --good:#2f7d4f; --strong:#1f6f5c;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121a17; --panel:#1a2420; --ink:#e6efea; --muted:#9baba4; --line:#2c3a34;
+    --accent:#58c4a5; --accent-ink:#0d1814; --track:#2c3a34;
+    --weak:#e0715f; --fair:#e0a94f; --good:#6cc28b; --strong:#58c4a5;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121a17; --panel:#1a2420; --ink:#e6efea; --muted:#9baba4; --line:#2c3a34;
+  --accent:#58c4a5; --accent-ink:#0d1814; --track:#2c3a34;
+  --weak:#e0715f; --fair:#e0a94f; --good:#6cc28b; --strong:#58c4a5;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Source Sans 3","Segoe UI",system-ui,sans-serif;line-height:1.5;min-height:100vh;display:flex;justify-content:center;padding:24px 16px}
+main{width:100%;max-width:520px}
+h1{font-family:"Source Serif 4",Georgia,serif;font-size:1.7rem;font-weight:600;margin:8px 0 4px}
+p.sub{margin:0 0 20px;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.out{display:flex;gap:8px;align-items:stretch}
+#pw{flex:1;min-width:0;font:600 1.25rem/1.4 ui-monospace,"SF Mono",Consolas,monospace;word-break:break-all;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-height:60px;display:flex;align-items:center}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:0 14px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:12px 16px;width:100%;margin-top:16px}
+.meter{height:8px;background:var(--track);border-radius:4px;margin:14px 0 4px;overflow:hidden}
+#bar{height:100%;width:0;background:var(--weak);transition:width .2s,background .2s}
+#strength{font-size:.9rem;color:var(--muted);display:flex;justify-content:space-between}
+.row{display:flex;justify-content:space-between;align-items:center;margin-top:20px}
+.row label{font-weight:600}
+#lenVal{font-family:ui-monospace,Consolas,monospace;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--accent);margin-top:8px}
+fieldset{border:0;padding:0;margin:16px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer}
+.opt input{accent-color:var(--accent);width:18px;height:18px;margin:0}
+.opt small{color:var(--muted);margin-left:auto;font-family:ui-monospace,Consolas,monospace}
+.check{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);cursor:pointer}
+.check input{accent-color:var(--accent);width:18px;height:18px;margin:0}
+#msg{min-height:1.4em;margin-top:10px;font-size:.9rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){#bar{transition:none}}
+@media (max-width:420px){fieldset{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Password generator</h1>
+  <p class="sub">Generated in your browser. Nothing is sent or stored.</p>
+  <section class="card">
+    <div class="out">
+      <div id="pw" aria-live="polite"></div>
+      <button id="copy" type="button" aria-label="Copy password">Copy</button>
+    </div>
+    <div class="meter"><div id="bar"></div></div>
+    <div id="strength"><span id="sLabel"></span><span id="sBits"></span></div>
+
+    <div class="row"><label for="len">Length</label><span id="lenVal">16</span></div>
+    <input id="len" type="range" min="6" max="64" value="16">
+
+    <fieldset>
+      <legend style="position:absolute;left:-9999px">Character types</legend>
+      <label class="opt"><input type="checkbox" id="lower" checked> Lowercase <small>a-z</small></label>
+      <label class="opt"><input type="checkbox" id="upper" checked> Uppercase <small>A-Z</small></label>
+      <label class="opt"><input type="checkbox" id="digit" checked> Numbers <small>0-9</small></label>
+      <label class="opt"><input type="checkbox" id="sym" checked> Symbols <small>!@#</small></label>
+    </fieldset>
+    <label class="check"><input type="checkbox" id="amb"> Skip look-alike characters (O, 0, l, 1, I)</label>
+
+    <button class="primary" id="gen" type="button">Generate new password</button>
+    <div id="msg" role="status"></div>
+  </section>
+</main>
+<script>
+(function(){
+  var sets={lower:"abcdefghijklmnopqrstuvwxyz",upper:"ABCDEFGHIJKLMNOPQRSTUVWXYZ",digit:"0123456789",sym:"!@#$%^&*()-_=+[]{};:,.?"};
+  var $=function(id){return document.getElementById(id)};
+  var pw=$("pw"),len=$("len"),msg=$("msg"),current="";
+
+  // Unbiased random integer in [0, n) using crypto
+  function rand(n){
+    var max=Math.floor(4294967296/n)*n, buf=new Uint32Array(1);
+    do{crypto.getRandomValues(buf)}while(buf[0]>=max);
+    return buf[0]%n;
+  }
+  function pools(){
+    var amb=$("amb").checked, out=[];
+    ["lower","upper","digit","sym"].forEach(function(k){
+      if($(k).checked){
+        var s=sets[k]; if(amb) s=s.replace(/[O0lI1|]/g,"");
+        out.push(s);
+      }
+    });
+    return out;
+  }
+  function generate(){
+    var p=pools();
+    if(!p.length){current="";pw.textContent="";msg.textContent="Select at least one character type.";update(0);return}
+    msg.textContent="";
+    var L=+len.value, all=p.join(""), chars=[];
+    // guarantee one from each selected type
+    p.forEach(function(s){chars.push(s[rand(s.length)])});
+    while(chars.length<L) chars.push(all[rand(all.length)]);
+    chars=chars.slice(0,Math.max(L,p.length));
+    for(var i=chars.length-1;i>0;i--){var j=rand(i+1),t=chars[i];chars[i]=chars[j];chars[j]=t}
+    current=chars.join("");
+    pw.textContent=current;
+    update(Math.log2(all.length)*current.length);
+  }
+  function update(bits){
+    var label,color,pct;
+    if(bits<45){label="Weak";color="var(--weak)";pct=20}
+    else if(bits<70){label="Fair";color="var(--fair)";pct=45}
+    else if(bits<100){label="Good";color="var(--good)";pct=70}
+    else{label="Strong";color="var(--strong)";pct=100}
+    if(!bits){label="";pct=0}
+    $("bar").style.width=pct+"%";$("bar").style.background=color;
+    $("sLabel").textContent=label;$("sBits").textContent=bits?Math.round(bits)+" bits":"";
+  }
+  function copy(){
+    if(!current)return;
+    function ok(){msg.textContent="Copied to clipboard.";}
+    function fail(){msg.textContent="Copy failed. Select the password and copy it manually.";}
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(current).then(ok,fail);return}
+    }catch(e){}
+    try{
+      var r=document.createRange();r.selectNodeContents(pw);var s=getSelection();s.removeAllRanges();s.addRange(r);
+      document.execCommand("copy")?ok():fail();
+    }catch(e){fail()}
+  }
+  len.addEventListener("input",function(){$("lenVal").textContent=len.value;generate()});
+  ["lower","upper","digit","sym","amb"].forEach(function(id){$(id).addEventListener("change",generate)});
+  $("gen").addEventListener("click",generate);
+  $("copy").addEventListener("click",copy);
+  generate();
+})();
+</script>
+</body>
+</html>
